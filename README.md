@@ -4,10 +4,10 @@
 
 This repository simulates IoT data exchanges using a RabbitMQ broker. 
 
-It contains a Docker image for RabbitMQ that enables the MQTT protocol and gives some definitions by creating a queue "queue.home" (for domotic sensors) and two bindings with the routing keys "light" and "sound".
+It contains a Docker image for RabbitMQ that enables the MQTT protocol and gives some definitions by creating a queue "queue.home" (for domotic sensors) and two bindings with the routing keys "light", "sound", "temperature", etc.
 This docker image enables rabbitmq-management that essentially offers an interface for managing and monitoring the exchanges (port 15672).
 
-The "collect_real_sensor_data.py" programm sends real sensor data to the RabbitMQ broker, precisely to the amq.topic exchange that sends it to the corresponding queue using the bindings in a JSON format.
+The "sensor_model.py" programm gets real sensors data from the file "data.csv", predicts the temperature using a CNN algorithm and sends the predicted measure in a JSON format to the RabbitMQ broker, precisely to the amq.topic exchange that sends it to the corresponding queue (here to the "temperature" queue) using the bindings.
 
 ## Setup
 
@@ -29,6 +29,4 @@ and use the login
 username: admin
 password: admin
 ```
-Then run the "collect_real_sensor_data.py" programm."# IoT-Simulator" 
-"# IoT-Simulator" 
-"# IoT-Simulator" 
+Then run the "sensor_model.py" programm
