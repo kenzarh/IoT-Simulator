@@ -29,4 +29,4 @@ and use the login
 username: admin
 password: admin
 ```
-Then run the "sensor_model.py" programm
+Then run the "sensor_model.py" programm.
