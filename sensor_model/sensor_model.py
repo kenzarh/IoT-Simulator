@@ -1,4 +1,4 @@
-# Importing the model
+# Importing the CNN model
 import tensorflow as tf 
 model = tf.keras.models.load_model("C:\\Users\\dell\\Desktop\\IoT Simulator\\sensor_model\\CNN.model")
 
@@ -12,43 +12,18 @@ Y = data[:,0] # Temperatures
 X = data [:,1:] # Features used to predict temperature 
 X = X.reshape(X.shape[0], X.shape[1], 1)
 
-# Function that creates the JSON message
-def metadata (name,category,type,frequency,url,time,data):
-  metadata = {
-  "sensor":{
-  "name":name,
-  "Category":category,
-  "Type":type,
-  "Hz":frequency,
-  "DataType":"Integer",
-  "Location":{
-    },
-    "url":url,
-    "port":5000
-  },
-  "data":{
-  "Timestamp":time,
-  "Data":data,
-  "Trust Factor":1,
-  "Scale Factor":1
-  }
-  }
-
-  return metadata
-
 
 # Sending the message to the RabbitMQ Broker
-
 import pika # The RabbitMQ client library for Python
-import time
-from datetime import datetime
-import json
-
 credentials = pika.PlainCredentials('admin', 'admin')
 parameters = pika.ConnectionParameters("localhost",5672,'/',credentials)
-
 connection = pika.BlockingConnection(parameters)
 channel = connection.channel()
+
+import time
+import datetime
+from message import send_data
+import xml.etree.ElementTree as ET
 
 i = 1000 # Starting whith the raw i
 
@@ -58,19 +33,12 @@ while True:
 
         # Predicting the temperature
         temperature = int(model.predict (X[i:i+1,:]))
+
+        now = datetime.datetime.now().timestamp()
         
+        message = send_data(typeObject="Temperature",idObject="VirtualTemperature1",idSensor="VirtualTemperature1",sensorCategory="virtual", sensorType="temperature",frequency=f,sensorLocation="virtual",time=now,unit="◦C",value=temperature)
 
-        now = datetime.now()
-        now = now.strftime("%d/%m/%Y %H:%M:%S")
-
-
-        message = metadata (name="Virtual temperature",category="virtual",type="temperature",frequency=f,url="XX",time=now,data=temperature)
-
-        print(message)
-        print(temperature)
-        print(Y [i])
-
-        channel.basic_publish(exchange='amq.topic', routing_key='temperature',body=json.dumps(message))
+        channel.basic_publish(exchange='amq.topic', routing_key='temperature',body=message)
 
         i = i + 1
 
