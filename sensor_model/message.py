@@ -2,7 +2,7 @@ def send_data (typeObject,idObject,idSensor,sensorCategory, sensorType,frequency
 
         # Importing the generic XML file
         import xml.etree.ElementTree as ET
-        tree = ET.parse('C:\\Users\\dell\\Desktop\\IoT Simulator\\sensor_model\\messages_format.xml')
+        tree = ET.parse('.\messages_format.xml')
         root = tree.getroot()
 
         # Changing the parameters
