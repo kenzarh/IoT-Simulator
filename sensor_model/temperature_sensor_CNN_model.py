@@ -2,45 +2,64 @@
 import tensorflow as tf 
 model = tf.keras.models.load_model(".\CNN.model")
 
-# Importing data (will be changed to collecting data from real sensors)
-import pandas as pd
-df = pd.read_csv('.\data.csv')
-columns = ['T (degC)','p (mbar)','H2OC (mmol/mol)','rho (g/m**3)']
-data = df[columns]
-data = data.values
-Y = data[:,0] # Temperatures
-X = data [:,1:] # Features used to predict temperature 
-X = X.reshape(X.shape[0], X.shape[1], 1)
-
-
-# Sending the message to the RabbitMQ Broker
+# Connection to the RabbitMQ Broker
 import pika # The RabbitMQ client library for Python
 credentials = pika.PlainCredentials('admin', 'admin')
 parameters = pika.ConnectionParameters("localhost",5672,'/',credentials)
-#connection = pika.BlockingConnection(parameters)
-#channel = connection.channel()
+connection = pika.BlockingConnection(parameters)
+channel = connection.channel()
 
 import time
 import datetime
 from message import send_data
 import xml.etree.ElementTree as ET
 
-i = 1000 # Starting whith the raw i
+# A class for retrieving data from queues
+class SensorValue(object):
+    def __init__(self,queue):
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters("localhost",5672,'/',pika.PlainCredentials('admin', 'admin')))
+        self.channel = self.connection.channel()
+        self.channel.basic_consume(queue=queue,on_message_callback=self.on_response,no_ack=True)
+    def on_response(self, ch, method, props, body):
+            self.response = body
+    def call(self):
+        self.response = None
+        while self.response is None:
+            self.connection.process_data_events()
+        parser = ET.XMLParser()
+        tree = ET.ElementTree(ET.fromstring(self.response, parser=parser)) 
+        root = tree.getroot()
+        value = root[0][2][1].text
+        return (value)
+
+# Each f seconds, retrieve data (air density, humidity and air pressure) from the broker, predict the temperature and send it to the broker
+
+f = 5 # Messages frequency
 
 while True:
 
-        f = 5 # Messages frequency
+        # Get the air density value
+        airdensity = SensorValue('airdensity').call()
+        print(airdensity)
+
+        # Get the humidity value
+        humidity = SensorValue('humidity').call()
+        print(humidity)
+
+        # Get the pressure value
+        pressure = SensorValue('pressure').call()
+        print(pressure)
 
         # Predicting the temperature
-        temperature = int(model.predict (X[i:i+1,:]))
+        X = [[[float(airdensity)],[float(humidity)],[float(pressure)]]]
+        temperature = int(model.predict (X))
+        print(temperature)
 
         now = datetime.datetime.now().timestamp()
         
-        message = send_data(typeObject="Temperature",idObject="VirtualTemperature1",idSensor="VirtualTemperature1",sensorCategory="virtual", sensorType="temperature",frequency=f,sensorLocation="virtual",time=now,unit="◦C",value=temperature)
+        message = send_data(typeObject="Temperature",idObject="VirtualTemperature1",idSensor="VirtualSensorTemperature1",sensorCategory="virtual", sensorType="temperature",frequency=f,sensorLocation="virtual",time=now,unit="◦C",value=temperature)
 
-        #channel.basic_publish(exchange='amq.topic', routing_key='temperature',body=message)
-        print (message)
-
-        i = i + 1
+        channel.basic_publish(exchange='amq.topic', routing_key='temperature',body=message)
+        #print (message)
 
         time.sleep(f)
