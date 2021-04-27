@@ -1,0 +1,100 @@
+version: '2.1'
+
+services:
+
+  rabbitmq:
+    build: ./rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "admin"
+      RABBITMQ_DEFAULT_PASS: "admin"
+      RABBITMQ_DEFAULT_VHOST: "/"
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS : -rabbitmq_management load_definitions "/tmp/rabbit.definitions.json"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    labels:
+      NAME: "rabbitmq"
+    volumes:
+      - './rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins'
+      - './rabbitmq/definitions.json:/tmp/rabbit.definitions.json:ro'
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:15672"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+
+  mongo_db:
+    image: mongo:latest
+    ports:
+      - 27017:27017
+    volumes:
+      - /C/Mine/mongoData:/data/db
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:15672"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+
+  mongo_express:
+    image: mongo-express:latest
+    environment:
+      - ME_CONFIG_OPTIONS_EDITORTHEME=default
+      - ME_CONFIG_MONGODB_SERVER=mongo_db
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_MONGODB_ENABLE_ADMIN=false
+      - ME_CONFIG_MONGODB_AUTH_DATABASE=rabbitmq_messages
+    ports:
+      - "8081:8081"
+    restart: on-failure
+    depends_on:
+      - mongo_db
+
+  store_all_messages:
+    build: 
+          context: './store_all_messages'
+          dockerfile: Dockerfile
+    depends_on:
+      - rabbitmq
+      - mongo_db
+       
+  random_airdensity:
+    build: 
+          context: './random_airdensity_sensor'
+          dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links: 
+        - rabbitmq
+
+  random_humidity:
+    build: 
+          context: './random_humidity_sensor'
+          dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links: 
+        - rabbitmq
+
+  random_pressure:
+    build: 
+          context: './random_pressure_sensor'
+          dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links: 
+        - rabbitmq
+
+  cnn_temperature:
+    build: 
+          context: './temperature_sensor_CNN_model'
+          dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links: 
+        - rabbitmq
+
+
