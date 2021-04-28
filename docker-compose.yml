@@ -30,10 +30,10 @@ services:
     volumes:
       - /C/Mine/mongoData:/data/db
     healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:15672"]
-        interval: 30s
-        timeout: 10s
-        retries: 5
+      test:  ["CMD", "docker-healthcheck"]
+      interval: 10s
+      timeout: 2s
+      retries: 10
 
   mongo_express:
     image: mongo-express:latest
@@ -48,14 +48,21 @@ services:
     restart: on-failure
     depends_on:
       - mongo_db
+    links: 
+        - mongo_db
 
   store_all_messages:
     build: 
           context: './store_all_messages'
           dockerfile: Dockerfile
     depends_on:
-      - rabbitmq
-      - mongo_db
+      rabbitmq:
+        condition: service_healthy
+      mongo_db:
+        condition: service_healthy
+    links: 
+        - rabbitmq
+        - mongo_db
        
   random_airdensity:
     build: 
