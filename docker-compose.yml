@@ -1,0 +1,35 @@
+version: '2.1'
+
+services:
+
+  rabbitmq:
+    build: ./rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: "admin"
+      RABBITMQ_DEFAULT_PASS: "admin"
+      RABBITMQ_DEFAULT_VHOST: "/"
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS : -rabbitmq_management load_definitions "/tmp/rabbit.definitions.json"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    labels:
+      NAME: "rabbitmq"
+    volumes:
+      - './rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins'
+      - './rabbitmq/definitions.json:/tmp/rabbit.definitions.json:ro'
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:15672"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+               
+  sensors:
+    build: 
+          context: ./
+          dockerfile: ./sensors/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links: 
+        - rabbitmq

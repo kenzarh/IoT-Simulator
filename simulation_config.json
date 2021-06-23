@@ -1,0 +1,259 @@
+{
+   "Simulation":{
+      "Name":"Test 2",
+      "Date":"14/06/2021",
+      "Output metrics":"./output_metrics.csv",
+      "Simulation stop":[
+         {
+            "Name":"messages_number",
+            "Value":10
+         },
+         {
+            "Name":"time_elapsed",
+            "Value": 20,
+            "Value unit":"min"
+         }
+      ],
+      "Metrics":[
+         {
+            "Name":"elapsed_time",
+            "Function":"Elapsed time in seconds"
+         },
+         {
+            "Name":"message_counter",
+            "Function":"Number of sent messages"
+         },
+         {
+            "Name":"debit_messages",
+            "Function":"message_counter / elapsed_time"
+         },
+         {
+            "Name":"deleted_messages",
+            "Function":"Number of deleted messages or messages that hasn't been sent"
+         },
+         {
+            "Name":"debit_deleted_messages",
+            "Function":"deleted_messages / elapsed_time"
+         },
+         {
+            "Name":"altered_messages",
+            "Function":"Number of altered messages"
+         },
+         {
+            "Name":"debit_altered_messages",
+            "Function":"altered_messages / elapsed_time"
+         },
+         {
+            "Name":"stops_number",
+            "Function":"Number of stops"
+         },
+         {
+            "Name":"debit_stops",
+            "Function":"stops_number / elapsed_time"
+         },
+         {
+            "Name":"stops_duration",
+            "Function":"Total duration of stops"
+         },
+         {
+            "Name":"filtred_values",
+            "Function":"Number of filters uses"
+         }
+      ]
+   },
+   "Sensors":[
+      {
+         "Sensor name":"Air Density 1",
+         "Measurement":"Air Density",
+         "sensorType":"RandomEditor",
+         "sendingRoutingKey":"airdensity",
+         "Unit":"g/m3",
+         "Data type":"double",
+         "Data interval":[1059,1394],
+         "Seconds between two messages":5,
+         "Filters":[
+            {
+               "Name":"Low Pass 1",
+               "Type":"Low-pass",
+               "Settings":{
+                  "Max value":1300,
+                  "Unit":"g/m3"
+               }
+            },
+            {
+               "Name":"High Pass 1",
+               "Type":"High-pass",
+               "Settings":{
+                  "Min value":1000,
+                  "Unit":"g/m3"
+               }
+            }
+         ],
+         "Perturbations":[
+                  {
+                     "Name":"delete_data",
+                     "Seconds between two deletions type": "random",
+                     "Seconds between two deletions interval": [5,10]
+                  },
+                  {
+                     "Name":"alter_data",
+                     "Seconds between two alterations type": "random",
+                     "Seconds between two alterations interval": [5,10]
+                  },
+                  {
+                     "Name":"stop",
+                     "Seconds between two stops type": "value",
+                     "Seconds between two stops interval": [8],
+                     "Stop duration value":2,
+                     "Stop duration unit":"s" 
+                  }
+         ],
+         "Final Stop":[
+                  {
+                     "Name":"messages_number",
+                     "Number of messages": 40
+                  },
+                  {
+                     "Name":"time_elapsed",
+                     "Elaspsed Time In Seconds" : 60
+                  }
+               ]
+            
+   
+      },
+
+
+
+
+
+
+
+
+
+
+      {
+         "Sensor name":"Humidity 1",
+         "Measurement":"Humidity",
+         "sensorType":"RandomEditor",
+         "sendingRoutingKey":"humidity",
+         "Unit":"mmol/mol",
+         "Data type":"double",
+         "Data interval":[0.8,29],
+         "Seconds between two messages":5,
+         "Filters":[
+         ],
+         "Perturbations":[
+                  {
+                     "Name":"alter_data",
+                     "Seconds between two alterations type": "random",
+                     "Seconds between two alterations interval": [5,20]
+                  },
+                  {
+                     "Name":"stop",
+                     "Seconds between two stops type": "value",
+                     "Seconds between two stops interval": [8],
+                     "Stop duration value":2,
+                     "Stop duration unit":"s" 
+                  }
+               ],
+         "Final Stop":[
+                  {
+                     "Name":"messages_number",
+                     "Number of messages": 40
+                  },
+                  {
+                     "Name":"time_elapsed",
+                     "Elaspsed Time In Seconds" : 60
+                  }
+               ]
+            
+         
+      },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      {
+         "Sensor name":"Pressure 1",
+         "Measurement":"Pressure",
+         "sensorType":"RandomEditor",
+         "sendingRoutingKey":"pressure",
+         "Unit":"mbar",
+         "Data type":"double",
+         "Data interval":[913,1016],
+         "Seconds between two messages":5,
+         "Filters":[
+            {
+               "Name":"Low Pass 1",
+               "Type":"Low-pass",
+               "Settings":{
+                  "Max value":1000,
+                  "Unit":"mbar"
+               }
+            },
+            {
+               "Name":"High Pass 1",
+               "Type":"High-pass",
+               "Settings":{
+                  "Min value":900,
+                  "Unit":"mbar"
+               }
+            }
+         ],
+         "Perturbations":[
+                  {
+                     "Name":"delete_data",
+                     "Seconds between two deletions type": "random",
+                     "Seconds between two deletions interval": [3,15]
+                  }
+         ],
+            
+         "Final Stop":[
+                  {
+                     "Name":"messages_number",
+                     "Number of messages": 40
+                  },
+                  {
+                     "Name":"time_elapsed",
+                     "Elaspsed Time In Seconds" : 60
+                  }
+               ]
+         
+      }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      
+   ]
+} 
