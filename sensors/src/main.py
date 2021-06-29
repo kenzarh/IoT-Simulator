@@ -1,5 +1,4 @@
 import pika
-# Connection to the RabbitMQ Broker
 credentials = pika.PlainCredentials('admin', 'admin')
 connection_parameters = pika.ConnectionParameters("host.docker.internal",5672,'/',credentials)
 
