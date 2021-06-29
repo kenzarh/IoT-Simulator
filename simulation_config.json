@@ -10,7 +10,7 @@
          },
          {
             "Name":"time_elapsed",
-            "Value": 1800,
+            "Value": 40,
             "Value unit":"min"
          }
       ],
