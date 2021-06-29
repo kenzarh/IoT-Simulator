@@ -3,8 +3,10 @@
 from threading import Thread
 import time
 from time import time as tm
+import pika
 
 class ThreadWithReturnValue(Thread):
+
     def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, Verbose=None):
         Thread.__init__(self, group, target, name, args, kwargs)
         self._return = None
@@ -15,33 +17,11 @@ class ThreadWithReturnValue(Thread):
         Thread.join(self, *args)
         return self._return
 
-# A class for retrieving data from queues
-class QueueValue(object):
-    def __init__(self,queue,connection,channel):
-        self.queue = queue
-        self.connection=connection
-        self.channel = channel
-        self.channel.basic_consume(queue=queue,on_message_callback=self.on_response,auto_ack=False)
-        #self.channel.consume(queue)
-    def on_response(self, ch, method, props, body):
-            self.response = body
-    def call(self):
-        import xml.etree.ElementTree as ET
-        self.response = None
-        while self.response is None:
-            self.response = self.connection.process_data_events()
-        time.sleep(0.5)
-        parser = ET.XMLParser()
-        tree = ET.ElementTree(ET.fromstring(self.response.decode('utf-8'), parser=parser)) 
-        root = tree.getroot()
-        value = root[0][2][1].text
-        return (value)
-
 class Simulation (object):
-    def __init__(self,configurationFile,channel,connection):
+
+    def __init__(self,configurationFile,connection_parameters):
+        self.connection_parameters=connection_parameters
         self.configurationFile = configurationFile
-        self.channel = channel
-        self.connection = connection
 
     def runSimulation(self):
 
@@ -58,7 +38,10 @@ class Simulation (object):
         file = open(self.configurationFile)
         configs = json.load(file)
 
-        global sentMessages
+        import threading
+
+        global sentMessages 
+        sentMessages = threading.Condition()
         sentMessages = 0
 
         simulationConditionsStop = configs["Simulation"]["Simulation stop"]
@@ -66,6 +49,10 @@ class Simulation (object):
         messagesNumberBeforeSimulationStop = math.inf
         elapsedTimeBeforeSimulationStop = math.inf
         elapsedTimeBeforeSimulationStopUnit = "s"
+        from functions import time_in_seconds
+        secondsElapsedBeforeSimulationStop = time_in_seconds(math.inf,"s")
+        numberOfMessagesFinalStop = NumberOfMessagesFinalStop(name="None",value=math.inf)
+        timeElapsedfinalStop = TimeElapsedfinalStop (name="None",value=math.inf)
 
         for simulationConditionStop in simulationConditionsStop:
             type = simulationConditionStop["Name"]
@@ -77,7 +64,6 @@ class Simulation (object):
                 timeElapsedBeforeStop = TimeElapsedBeforeStop(type,simulationConditionStop["Value"])
                 elapsedTimeBeforeSimulationStop = simulationConditionStop["Value"]
                 elapsedTimeBeforeSimulationStopUnit = simulationConditionStop["Value unit"]
-                from functions import time_in_seconds
                 secondsElapsedBeforeSimulationStop = time_in_seconds(elapsedTimeBeforeSimulationStop,elapsedTimeBeforeSimulationStopUnit)
  
         sensors = configs ["Sensors"]
@@ -91,7 +77,7 @@ class Simulation (object):
         # Loop over the sensors list
         for sensor in sensors:
 
-            name = sensor["Sensor name"]
+            sensor_name = sensor["Sensor name"]
             sensorType = sensor["sensorType"]
 
             deleteDataPerturbation = DeleteDataPerturbation(name="perturbationName",secondsBetweenTwoPerturbationsType="value",secondsBetweenTwoPerturbationsInterval=[math.inf])
@@ -104,6 +90,9 @@ class Simulation (object):
             dataInterval = sensor["Data interval"]
             secondsBetweenTwoMessages = sensor["Seconds between two messages"]
             sendingRoutingKey = sensor["sendingRoutingKey"]
+
+            numberOfMessagesFinalStop = NumberOfMessagesFinalStop(name="None",value=math.inf)
+            timeElapsedfinalStop = TimeElapsedfinalStop (name="None",value=math.inf)
 
             filters = []
             filtersInConfig = sensor["Filters"]
@@ -148,22 +137,21 @@ class Simulation (object):
                             timeElapsedfinalStop = TimeElapsedfinalStop (name=finalStop["Name"],value=finalStop["Elaspsed Time In Seconds"])
 
             if (sensorType == "RandomEditor"):
-                sensor = RandomNumericalSensor (name=name,measurement=measurement,datatype=datatype,unit=unit,location="virtual",dataInterval=dataInterval,secondsBetweenTwoMessages=secondsBetweenTwoMessages,sendingRoutingKey=sendingRoutingKey)
+                sensor = RandomNumericalSensor (name=sensor_name,measurement=measurement,datatype=datatype,unit=unit,location="virtual",dataInterval=dataInterval,secondsBetweenTwoMessages=secondsBetweenTwoMessages,sendingRoutingKey=sendingRoutingKey)
 
             elif (sensorType == "TemperaturePredictor"):
-                sensor = TemperaturePredictor (name=name,measurement=measurement,datatype=datatype,unit=unit,location="virtual",dataInterval=dataInterval,secondsBetweenTwoMessages=secondsBetweenTwoMessages,sendingRoutingKey=sendingRoutingKey,receivingRoutingKey=sensor["receivingRoutingKey"],modelFile="CNNmodel",connection=self.connection)
+                sensor = TemperaturePredictor (name=sensor_name,measurement=measurement,datatype=datatype,unit=unit,location="virtual",dataInterval=dataInterval,secondsBetweenTwoMessages=secondsBetweenTwoMessages,sendingRoutingKey=sendingRoutingKey,receivingRoutingKey=sensor["receivingRoutingKey"],modelFile="CNNmodel")
 
-            thread = ThreadWithReturnValue(target=sensor.runSensor, args=(self.channel,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,deleteDataPerturbation,alterDataPerturbation,temporarySensorStop,filters,))
+            thread = ThreadWithReturnValue(target=sensor.runSensor, args=(self.connection_parameters,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,deleteDataPerturbation,alterDataPerturbation,temporarySensorStop,filters,))
             threads.append(thread)
             thread.start()
-            time.sleep(0.1)
 
         # Waiting for all threads to finish
         for thread in threads:
 
             L = thread.join()
             print(L)
-            [number_of_sent_messages , seconds_elapsed , number_of_filtred_values , number_of_deleted_messages , number_of_altered_messages , number_of_stops , total_stops_duration] = L
+            [sensor_name,number_of_sent_messages , seconds_elapsed , number_of_filtred_values , number_of_deleted_messages , number_of_altered_messages , number_of_stops , total_stops_duration] = L
             messages_number_list.append(number_of_sent_messages)
             deleted_messages_list.append(number_of_deleted_messages)
             altered_messages_list.append(number_of_altered_messages)
@@ -181,7 +169,6 @@ class Simulation (object):
         # Calculate elapsed time 2
         end_time = tm()
         seconds_elapsed = end_time - start_time
-        #print(seconds_elapsed)
         timeElapsed = TimeElapsed (name="Elapsed Time" , formula = "Simulation duration" , value=seconds_elapsed)
         metrics.append(timeElapsed.value)
 
@@ -252,15 +239,16 @@ class AbstractSensor(object):
         self.dataInterval = dataInterval
         self.secondsBetweenTwoMessages = secondsBetweenTwoMessages
         self.sendingRoutingKey=sendingRoutingKey
-    def runSensor(self,channel,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
+    def runSensor(self,connection_parameters,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
         raise NotImplementedError('Subclasses must override the method!')
 
 class RandomNumericalSensor(AbstractSensor):
-    def runSensor(self,channel,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
+    def runSensor(self,connection_parameters,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
         global sentMessages
         global messagesNumberBeforeSimulationStop
         simulation_start_time = start_time
         import random
+        import pika
         import datetime
         import time
         from time import time as tm
@@ -279,61 +267,65 @@ class RandomNumericalSensor(AbstractSensor):
         time_alter_data_1 = tm()
         time_stop_1 = tm()
         elapsed_time_from_simulation_start = 0
+        import threading
+        lock = threading.Lock()
         while ((numberOfMessagesFinalStop.generateStop(number_of_sent_messages)==False) and (timeElapsedfinalStop.generateStop(seconds_elapsed)==False) and (elapsed_time_from_simulation_start<secondsElapsedBeforeSimulationStop) and (sentMessages<messagesNumberBeforeSimulationStop)):
-            value = random.uniform(min,max)
-            for filter in filters:
-                valueAfterFilter = filter.applyFilter(value)
-                if (value!=valueAfterFilter):
-                    number_of_filtred_values = number_of_filtred_values + 1
-                    value = valueAfterFilter
-            now = datetime.datetime.now().timestamp()
-            time_delete_data_2 = tm()
-            elapsedTimeAfterDeleteData = time_delete_data_2 - time_delete_data_1
-            if (DeleteDataPerturbation.generatePerturbation(elapsedTimeAfterDeleteData) == False):
-                time.sleep(self.secondsBetweenTwoMessages)
-                time_alter_data_2 = tm()
-                elapsedTimeAfterAlterData = time_alter_data_2 - time_alter_data_1
-                if (AlterDataPerturbation.generatePerturbation(elapsedTimeAfterAlterData,value) == False):
-                    message = send_data(typeObject=self.measurement,idObject="Random"+self.measurement+str(number_of_sent_messages+1),idSensor=self.name,sensorCategory="virtual", sensorType="Random"+self.measurement,secondsBetweenTwoMessages=self.secondsBetweenTwoMessages,sensorLocation="virtual",time=now,unit=self.unit,value=value)
-                    time_stop_2 = tm()
-                    elapsedTimeAfterStop = time_stop_2 - time_stop_1
-                    stop_duration = TemporarySensorStop.generatePerturbation(elapsedTimeAfterStop)
-                    if (stop_duration != -1):
-                        time.sleep(stop_duration)
-                        time_stop_1 = tm()
-                        number_of_stops = number_of_stops + 1
-                        total_stops_duration = total_stops_duration + stop_duration
-                    channel.basic_publish(exchange='amq.topic', routing_key=self.sendingRoutingKey,body=message)
-                    sentMessages = sentMessages + 1
-                    number_of_sent_messages = number_of_sent_messages + 1
-                else:
-                    alteredValue = AlterDataPerturbation.generatePerturbation(elapsedTimeAfterDeleteData,value)
-                    time_alter_data_1 = tm()
-                    message = send_data(typeObject=self.measurement,idObject="Random"+self.measurement+str(number_of_sent_messages+1),idSensor=self.name,sensorCategory="virtual", sensorType="Random"+self.measurement,secondsBetweenTwoMessages=self.secondsBetweenTwoMessages,sensorLocation="virtual",time=now,unit=self.unit,value=alteredValue)
-                    number_of_altered_messages = number_of_altered_messages + 1
-            elif (DeleteDataPerturbation.generatePerturbation(elapsedTimeAfterDeleteData) == True):
-                number_of_deleted_messages = number_of_deleted_messages + 1
-                time_delete_data_1 = tm()
-            end_time = tm()
-            seconds_elapsed = end_time - start_time
-            elapsed_time_from_simulation_start = tm() - simulation_start_time
-        return [number_of_sent_messages , seconds_elapsed , number_of_filtred_values , number_of_deleted_messages , number_of_altered_messages , number_of_stops , total_stops_duration]
-
+                value = random.uniform(min,max)
+                for filter in filters:
+                    valueAfterFilter = filter.applyFilter(value)
+                    if (value!=valueAfterFilter):
+                        number_of_filtred_values = number_of_filtred_values + 1
+                        value = valueAfterFilter
+                now = datetime.datetime.now().timestamp()
+                time_delete_data_2 = tm()
+                elapsedTimeAfterDeleteData = time_delete_data_2 - time_delete_data_1
+                if (DeleteDataPerturbation.generatePerturbation(elapsedTimeAfterDeleteData) == False):
+                    time.sleep(self.secondsBetweenTwoMessages)
+                    time_alter_data_2 = tm()
+                    elapsedTimeAfterAlterData = time_alter_data_2 - time_alter_data_1
+                    if (AlterDataPerturbation.generatePerturbation(elapsedTimeAfterAlterData,value) == False):
+                        message = send_data(typeObject=self.measurement,idObject="Random"+self.measurement+str(number_of_sent_messages+1),idSensor=self.name,sensorCategory="virtual", sensorType="Random"+self.measurement,secondsBetweenTwoMessages=self.secondsBetweenTwoMessages,sensorLocation="virtual",time=now,unit=self.unit,value=value)
+                        time_stop_2 = tm()
+                        elapsedTimeAfterStop = time_stop_2 - time_stop_1
+                        stop_duration = TemporarySensorStop.generatePerturbation(elapsedTimeAfterStop)
+                        if (stop_duration != -1):
+                            time.sleep(stop_duration)
+                            time_stop_1 = tm()
+                            number_of_stops = number_of_stops + 1
+                            total_stops_duration = total_stops_duration + stop_duration
+                        if ((elapsed_time_from_simulation_start<secondsElapsedBeforeSimulationStop) and (sentMessages<messagesNumberBeforeSimulationStop)):
+                            connection = pika.BlockingConnection(connection_parameters)
+                            channel = connection.channel()
+                            channel.basic_publish(exchange='amq.topic', routing_key=self.sendingRoutingKey,body=message)
+                            sentMessages = sentMessages + 1
+                            number_of_sent_messages = number_of_sent_messages + 1
+                    else:
+                        alteredValue = AlterDataPerturbation.generatePerturbation(elapsedTimeAfterDeleteData,value)
+                        time_alter_data_1 = tm()
+                        message = send_data(typeObject=self.measurement,idObject="Random"+self.measurement+str(number_of_sent_messages+1),idSensor=self.name,sensorCategory="virtual", sensorType="Random"+self.measurement,secondsBetweenTwoMessages=self.secondsBetweenTwoMessages,sensorLocation="virtual",time=now,unit=self.unit,value=alteredValue)
+                        number_of_altered_messages = number_of_altered_messages + 1
+                elif (DeleteDataPerturbation.generatePerturbation(elapsedTimeAfterDeleteData) == True):
+                    number_of_deleted_messages = number_of_deleted_messages + 1
+                    time_delete_data_1 = tm()
+                end_time = tm()
+                seconds_elapsed = end_time - start_time
+                elapsed_time_from_simulation_start = tm() - simulation_start_time
+            
+        return [self.name,number_of_sent_messages , seconds_elapsed , number_of_filtred_values , number_of_deleted_messages , number_of_altered_messages , number_of_stops , total_stops_duration]
 
 class AbstractEditorConsumerSensor (AbstractSensor):
     def __init__(self,name,measurement,datatype,unit,location,dataInterval,secondsBetweenTwoMessages,sendingRoutingKey,receivingRoutingKey):
         super(AbstractSensor, self).__init__()
         self.receivingRoutingKey = receivingRoutingKey
-    def runSensor(self,channel,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
+    def runSensor(self,connection_parameters,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
         raise NotImplementedError('Subclasses must override the method!')
 
 class TemperaturePredictor (AbstractEditorConsumerSensor):
-    def __init__(self,name,measurement,datatype,unit,location,dataInterval,secondsBetweenTwoMessages,sendingRoutingKey,receivingRoutingKey,modelFile,connection):
+    def __init__(self,name,measurement,datatype,unit,location,dataInterval,secondsBetweenTwoMessages,sendingRoutingKey,receivingRoutingKey,modelFile):
         super(AbstractEditorConsumerSensor, self).__init__(name,measurement,datatype,unit,location,dataInterval,secondsBetweenTwoMessages,sendingRoutingKey)
         self.receivingRoutingKey = receivingRoutingKey
-        self.connection = connection
         self.modelFile = modelFile
-    def runSensor(self,channel,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
+    def runSensor(self,connection_parameters,start_time,secondsElapsedBeforeSimulationStop,numberOfMessagesFinalStop,timeElapsedfinalStop,DeleteDataPerturbation,AlterDataPerturbation,TemporarySensorStop,filters=[]):
         global sentMessages
         global messagesNumberBeforeSimulationStop
         simulation_start_time = start_time
@@ -355,53 +347,50 @@ class TemperaturePredictor (AbstractEditorConsumerSensor):
         time_alter_data_1 = tm()
         time_stop_1 = tm()
         elapsed_time_from_simulation_start = 0
-        import tensorflow
-        # Importing the CNN model
-        model = tensorflow.keras.models.load_model(self.modelFile)
-        ##################################################################
-        time.sleep(0.1)
         while ((numberOfMessagesFinalStop.generateStop(number_of_sent_messages)==False) and (timeElapsedfinalStop.generateStop(seconds_elapsed)==False) and (elapsed_time_from_simulation_start<secondsElapsedBeforeSimulationStop) and (sentMessages<messagesNumberBeforeSimulationStop)):
+            connection = pika.BlockingConnection(connection_parameters)
+            channel = connection.channel() 
             # Get air density value
-            #airdensity = QueueValue(self.receivingRoutingKey[0],self.connection,channel).call()
-            method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[0])        
-            while method_frame.NAME == 'Basic.GetEmpty':          
-                    channel.basic_ack(delivery_tag=method_frame.delivery_tag, multiple=True)
+            method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[0]) 
+            while not method_frame:
+                method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[0]) 
+            channel.basic_ack(method_frame.delivery_tag)        
             import xml.etree.ElementTree as ET
             parser = ET.XMLParser()
             tree = ET.ElementTree(ET.fromstring(body.decode('utf-8'), parser=parser)) 
             root = tree.getroot()
-            airdensity = float(root[0][2][1].text)
-           
+            airdensity = float(root[0][2][1].text) 
             print("airdensity:",airdensity)
 
             # Get humidity value
-            #humidity = QueueValue(self.receivingRoutingKey[1],self.connection,channel).call()
-            method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[1])        
-            while method_frame.NAME == 'Basic.GetEmpty':          
-                    channel.basic_ack(delivery_tag=method_frame.delivery_tag, multiple=True)
-         
+            method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[1]) 
+            while not method_frame:
+                method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[1]) 
+            channel.basic_ack(method_frame.delivery_tag)      
+            import xml.etree.ElementTree as ET
             parser = ET.XMLParser()
             tree = ET.ElementTree(ET.fromstring(body.decode('utf-8'), parser=parser)) 
             root = tree.getroot()
-            humidity = float(root[0][2][1].text)
-            print("humidity:",humidity)
+            humidity = float(root[0][2][1].text) 
+
             # Get the pressure value
-            #pressure = QueueValue(self.receivingRoutingKey[2],self.connection,channel).call()
-            method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[2])        
-            while method_frame.NAME == 'Basic.GetEmpty':          
-                    channel.basic_ack(delivery_tag=method_frame.delivery_tag, multiple=True)
-         
+            method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[2])   
+            while not method_frame:
+                method_frame, header_frame, body = channel.basic_get(queue = self.receivingRoutingKey[2]) 
+            channel.basic_ack(method_frame.delivery_tag)      
+            import xml.etree.ElementTree as ET
             parser = ET.XMLParser()
             tree = ET.ElementTree(ET.fromstring(body.decode('utf-8'), parser=parser)) 
             root = tree.getroot()
             pressure = float(root[0][2][1].text)
             print("pressure:",pressure)
+           
             # Predicting the temperature
-            X = [[[float(airdensity)],[float(humidity)],[float(pressure)]]]
-            value = model.predict (X)
-            #value = float(airdensity) - float(pressure) + float(humidity)
+            X = [[float(airdensity),float(humidity),float(pressure)]]
+            import pickle
+            loaded_model = pickle.load(open("temperature_model.sav", 'rb'))
+            value = loaded_model.predict(X)
         
- 
             for filter in filters:
                 valueAfterFilter = filter.applyFilter(value)
                 if (value!=valueAfterFilter):
@@ -438,11 +427,7 @@ class TemperaturePredictor (AbstractEditorConsumerSensor):
             end_time = tm()
             seconds_elapsed = end_time - start_time
             elapsed_time_from_simulation_start = tm() - simulation_start_time
-        return [number_of_sent_messages , seconds_elapsed , number_of_filtred_values , number_of_deleted_messages , number_of_altered_messages , number_of_stops , total_stops_duration]
-
-
-
-
+        return [self.name,number_of_sent_messages , seconds_elapsed , number_of_filtred_values , number_of_deleted_messages , number_of_altered_messages , number_of_stops , total_stops_duration]
 
 class AbstractFilter(object):
     def __init__(self,name,filtredValue):
@@ -633,6 +618,3 @@ class FiltredValues (AbstractMetric):
         for n in filtred_values_list:
             total_filtred_values = total_filtred_values + n
         return(total_filtred_values)
-        
-        
-

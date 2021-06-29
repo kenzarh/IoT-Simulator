@@ -45,6 +45,7 @@ def send_data (typeObject,idObject,idSensor,sensorCategory,sensorType,secondsBet
 
 
 # Function that transforms time to seconds. It takes the value and the unit and returns the value in seconds
+
 def time_in_seconds (value,unit):
 
         if unit == "s":
@@ -57,23 +58,3 @@ def time_in_seconds (value,unit):
                 seconds = value*3600
         return seconds
 
-# A class for retrieving data from queues
-import xml.etree.ElementTree as ET
-import pika
-class SensorValue(object):
-    def __init__(self,queue):
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters("host.docker.internal",5672,'/',pika.PlainCredentials('admin', 'admin')))
-        #self.connection = pika.BlockingConnection(pika.ConnectionParameters("localhost",5672,'/',pika.PlainCredentials('admin', 'admin')))
-        self.channel = self.connection.channel()
-        self.channel.basic_consume(queue=queue,on_message_callback=self.on_response,auto_ack=False)
-    def on_response(self, ch, method, props, body):
-            self.response = body
-    def call(self):
-        self.response = None
-        while self.response is None:
-            self.connection.process_data_events()
-        parser = ET.XMLParser()
-        tree = ET.ElementTree(ET.fromstring(self.response, parser=parser)) 
-        root = tree.getroot()
-        value = root[0][2][1].text
-        return (value)

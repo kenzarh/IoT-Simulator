@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Exemple d'envoi d'une donnée température d'un capteur virtuel. -->
+<Objects xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="odf.xsd">
+    <Object type="typeObject">
+        <id>idObject</id>
+
+        <InfoItem name="SensorInfos">
+            <MetaData>
+                <InfoItem name="id"><value type="xs:string">idSensor</value></InfoItem>
+                <InfoItem name="category"><value type="xs:string">sensorCategory</value></InfoItem>
+                <InfoItem name="type"><value type="xs:string">sensorType</value></InfoItem>
+                <InfoItem name="seconds_between_two_messages"><value type="xs:int">seconds_between_two_messages</value></InfoItem>
+                <InfoItem name="location"><value type="xs:string">sensorLocation</value></InfoItem>
+            </MetaData>
+        </InfoItem>
+
+        <InfoItem name="Value">
+            <MetaData>
+                <InfoItem name="timestamp"><value type="xs:dateTime">time</value></InfoItem>
+                <InfoItem name="format"><value type="xs:string">xs:double</value></InfoItem>
+                <InfoItem name="unit"><value type="xs:string">unit</value></InfoItem>
+            </MetaData>
+            <value>value</value>
+        </InfoItem>
+
+    </Object>
+</Objects>
+
