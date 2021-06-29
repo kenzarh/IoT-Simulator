@@ -15,4 +15,5 @@ COPY ./ .
 COPY sensors/src/ .
 
 # command to run on container start
+#RUN python main.py
 CMD [ "python", "./main.py" ]
