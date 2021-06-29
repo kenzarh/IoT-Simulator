@@ -1,16 +1,16 @@
 {
    "Simulation":{
-      "Name":"Test 2",
-      "Date":"14/06/2021",
+      "Name":"Test 1",
+      "Date":"29/06/2021",
       "Output metrics":"./output_metrics.csv",
       "Simulation stop":[
          {
             "Name":"messages_number",
-            "Value":10
+            "Value":1000
          },
          {
             "Name":"time_elapsed",
-            "Value": 20,
+            "Value": 1800,
             "Value unit":"min"
          }
       ],
@@ -111,26 +111,14 @@
          "Final Stop":[
                   {
                      "Name":"messages_number",
-                     "Number of messages": 40
+                     "Number of messages": 1000
                   },
                   {
                      "Name":"time_elapsed",
-                     "Elaspsed Time In Seconds" : 60
+                     "Elaspsed Time In Seconds" : 1800
                   }
                ]
-            
-   
       },
-
-
-
-
-
-
-
-
-
-
       {
          "Sensor name":"Humidity 1",
          "Measurement":"Humidity",
@@ -159,35 +147,14 @@
          "Final Stop":[
                   {
                      "Name":"messages_number",
-                     "Number of messages": 40
+                     "Number of messages": 1000
                   },
                   {
                      "Name":"time_elapsed",
-                     "Elaspsed Time In Seconds" : 60
+                     "Elaspsed Time In Seconds" : 1800
                   }
                ]
-            
-         
       },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       {
          "Sensor name":"Pressure 1",
          "Measurement":"Pressure",
@@ -226,34 +193,55 @@
          "Final Stop":[
                   {
                      "Name":"messages_number",
-                     "Number of messages": 40
+                     "Number of messages": 1000
                   },
                   {
                      "Name":"time_elapsed",
-                     "Elaspsed Time In Seconds" : 60
+                     "Elaspsed Time In Seconds" : 1800
                   }
                ]
-         
+      },
+      {
+         "Sensor name":"Temperature 1",
+         "Measurement":"Temperature",
+         "sensorType":"TemperaturePredictor",
+         "sendingRoutingKey":"temperature",
+         "receivingRoutingKey":["airdensity","humidity","pressure"],
+         "Unit":"°C",
+         "Data type":"double",
+         "Data interval":[-10,25],
+         "Seconds between two messages":5,
+         "Filters":[
+            {
+               "Name":"Low Pass 1",
+               "Type":"Low-pass",
+               "Settings":{
+                  "Max value":20,
+                  "Unit":"°C"
+               }
+            },
+            {
+               "Name":"High Pass 1",
+               "Type":"High-pass",
+               "Settings":{
+                  "Min value":-5,
+                  "Unit":"°C"
+               }
+            }
+         ],
+         "Perturbations":[ 
+         ],
+            
+         "Final Stop":[
+                  {
+                     "Name":"messages_number",
+                     "Number of messages": 1000
+                  },
+                  {
+                     "Name":"time_elapsed",
+                     "Elaspsed Time In Seconds" : 1800
+                  }
+               ]
       }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      
    ]
 } 
